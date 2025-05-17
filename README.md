@@ -1,7 +1,6 @@
 # 🌀 Tackling Hallucination from Conditional Models for Medical Image Reconstruction with DynamicDPS
 
-Official implementation of the MICCAI 2025 (Early Accept, Top 9%) paper:  
-**"Mitigating Hallucination from Conditional Models for MRI Reconstruction with DynamicDPS"**
+**Official implementation of the MICCAI 2025 (Early Accept, Top 9%) paper**
 
 **Code still under development**
 
