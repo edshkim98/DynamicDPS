@@ -21,14 +21,27 @@ Hallucinations are spurious structures not present in the ground truth, posing a
 ### 🧑‍🏫 Training the Score-Matching Model
 ```bash
 python image_train.py
+```
 
 ### 🖼️ Sampling Random Images from the Diffusion Model
+```bash
 python image_sample_all.py
+```
 
 ### 🔄 Solve Inverse Problems (e.g., Low-Field MRI Enhancement)
+```bash
 python image_sample.py
+```
 
 ### 📌 Citation
-If you find this work useful, please consider citing us (BibTeX coming soon).
+If you find this work useful, please consider citing us:
 
+```bibtex
+@article{kim2025tackling,
+  title={Tackling Hallucination from Conditional Models for Medical Image Reconstruction with DynamicDPS},
+  author={Kim, Seunghoi and Tregidgo, Henry FJ and Figini, Matteo and Jin, Chen and Joshi, Sarang and Alexander, Daniel C},
+  journal={arXiv preprint arXiv:2503.01075},
+  year={2025}
+}
+```
 
