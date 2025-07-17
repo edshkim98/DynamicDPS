@@ -32,5 +32,5 @@ source /share/apps/source_files/cuda/cuda-11.0.source
 
 source /home/seunghki/skim_py39/bin/activate
 
-python3 image_sample.py
+python3 test.py
 

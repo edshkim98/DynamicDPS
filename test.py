@@ -6,6 +6,7 @@ numpy array. This can be used to produce samples for FID evaluation.
 import argparse
 import glob
 import os
+import pandas as pd
 
 import numpy as np
 import torch
@@ -131,6 +132,7 @@ def main():
         fname_curr, slice_curr = int(data_dict['file_id'][0]), str(data_dict['slice_idx'].numpy()[0])
         print(fname_curr, slice_curr)
         
+        # Load the conditional model's output
         data = np.load(f'./cond_results/unet/ood_contrast/{fname_curr}/pred_{slice_curr}_axial.npy')[0]
         mean = 271.64814106698583
         std = 377.117173547721
@@ -139,16 +141,53 @@ def main():
         data = np.clip(data, 0., 2.0)
         print("DATA shape")
         print(data.min(), data.max())
-        
-        # Inject noise if skip_timestep is enabled
-        if configs['skip_timestep']:
-            skip_x0 = torch.tensor(data).unsqueeze(0).unsqueeze(0).to(torch.float32).to(device)
-        else:
-            skip_x0 = None
+
+        # Load the reference memory bank
+        df = pd.read_csv('./reference_memorybank.csv')
+        loss_dict = {}
+        group_size = 50
+        for i in range(0, 1000, 1):
+            curr_time = '[' + str(i) + ']'
+            df_curr = df[df['time'] == curr_time]
+            loss = df_curr['Loss'].values
+            loss_dict[i] = np.mean(loss)
+
+        # 1. Sort your keys so that you can iterate in ascending or descending order
+        sorted_keys = sorted(loss_dict.keys())
+        sorted_values = [loss_dict[k] for k in sorted_keys]
+
+        # 2. Chunk the keys and values into groups of size `group_size`
+        chunks = [sorted_keys[i:i + group_size] for i in range(0, len(sorted_keys), group_size)]
+        values_chunks = [sorted_values[i:i + group_size] for i in range(0, len(sorted_values), group_size)]
+
+        # 3. Compute the average of each chunk
+        mean_keys = [np.mean(chunk) for chunk in chunks]
+        mean_values = [np.mean(values_chunk) for values_chunk in values_chunks]
 
         # Forward measurement model (Ax + n)
         y = operator.forward(ref_img)
         y_n = noiser(y)
+
+        # Downsample the conditional data
+        data = torch.tensor(data).unsqueeze(0).unsqueeze(0).to(torch.float32).to(device)
+        data_low = operator.forward(data)
+
+        # Calculate the data likelihood
+        test_likelihood = torch.linalg.norm(y - data_low)
+        print(f"Test likelihood: {test_likelihood.item()}")
+
+        # Find the time index corresponding to the closest mean value
+        closest_time_idx = np.argmin(np.abs(mean_values - test_likelihood.item()))
+        print(f"Closest time index: {closest_time_idx}, Mean value: {mean_values[closest_time_idx]}")
+        # Get the corresponding time value
+        closest_time = mean_keys[closest_time_idx] * group_size
+        print(f"Closest time: {closest_time}")
+        
+        # Inject noise if skip_timestep is enabled 
+        if configs['skip_timestep']:
+            skip_x0 = 1000 - closest_time #torch.tensor(data).unsqueeze(0).unsqueeze(0).to(torch.float32).to(device)
+        else:
+            skip_x0 = None
             
         sample_fn = (
             diffusion.p_sample_loop if not args.use_ddim else diffusion.ddim_sample_loop
