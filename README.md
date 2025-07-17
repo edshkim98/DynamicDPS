@@ -18,7 +18,7 @@ Hallucinations—spurious structures not present in ground truth—pose a critic
 
 Below: Visual comparisons on real low-field MR scans. DynamicDPS demonstrates superior reconstruction quality with fewer hallucinated features.
 
-![Visual comparisons on real low-field MR scans](images/visual_comparison.png)
+![Visual comparisons on real low-field MR scans](imgs/results_real.png)
 
 ---
 
@@ -26,7 +26,7 @@ Below: Visual comparisons on real low-field MR scans. DynamicDPS demonstrates su
 
 The schematic below illustrates our method (DynamicDPS) in comparison to traditional approaches. DynamicDPS achieves faster inference and avoids hallucination, outperforming standard conditional and diffusion models.
 
-![Schematic overview: DynamicDPS vs. traditional approaches](images/method_overview.png)
+![Schematic overview: DynamicDPS vs. traditional approaches](imgs/method_simple.png)
 
 ---
 
