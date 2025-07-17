@@ -10,7 +10,7 @@
 
 ## Overview
 
-Hallucinations—spurious structures not present in ground truth—pose a critical challenge in medical image reconstruction, particularly for data-driven conditional models. Our work investigates this phenomenon and introduces DynamicDPS, an innovative approach designed to mitigate hallucination while improving reconstruction fidelity and efficiency.
+Hallucinations, spurious structures not present in ground truth, pose a critical challenge in medical image reconstruction, particularly for data-driven conditional models. Our work investigates this phenomenon and introduces DynamicDPS, an innovative approach designed to mitigate hallucination while improving reconstruction fidelity and efficiency.
 
 ---
 
