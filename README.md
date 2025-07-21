@@ -35,6 +35,8 @@ Below: Visual comparisons on real low-field MR scans. DynamicDPS demonstrates su
 ## Usage
 
 > **Note:** The final cleaned-up version of the code will be released soon.
+>
+> You need to unzip motionblur.zip first
 
 ### Training the Score-Matching Model
 ```bash
