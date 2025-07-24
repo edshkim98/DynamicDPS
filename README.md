@@ -25,7 +25,7 @@ The schematic below illustrates our method (DynamicDPS) in comparison to traditi
 
 ## Visual Comparisons
 
-Below: Visual comparisons on real low-field MR scans. DynamicDPS demonstrates superior reconstruction quality with fewer hallucinated features.
+Below: Visual comparisons on REAL low-field MR scans. DynamicDPS demonstrates superior reconstruction quality with fewer hallucinated features.
 
 ![Visual comparisons on real low-field MR scans](imgs/results_real.png)
 
@@ -35,6 +35,8 @@ Below: Visual comparisons on real low-field MR scans. DynamicDPS demonstrates su
 ## Usage
 
 > **Note:** The final cleaned-up version of the code will be released soon.
+>
+> You need to unzip motionblur.zip first
 
 ### Training the Score-Matching Model
 ```bash
