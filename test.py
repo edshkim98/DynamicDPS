@@ -55,6 +55,8 @@ def main():
         configs=configs,
         **args_to_dict(args, model_and_diffusion_defaults().keys())
     )
+    
+    assert args.model_path != "ADD_YOUR_MODEL_PATH_HERE.pth", "Please specify the model path."
     model.load_state_dict(torch.load(args.model_path, map_location="cpu"))
     model.to(device)
     if args.use_fp16:
@@ -63,17 +65,16 @@ def main():
     print('Using device:', device)
 
     # Configuration paths and file handling
-    save_path = '/cluster/project0/IQT_Nigeria/skim/DynamicDPS_unet_contrast/'
+    save_path = './DynamicDPS_results/'
     lst_files = [
         '116120', '116221', '116423', '116524', '116726', '117021', '117122', 
         '117324', '117728', '117930', '118023', '118124', '118225', '118528', 
         '118730', '118831', '118932', '119025', '119126', '119732'
     ]
     
-    data_dir = '/cluster/project0/IQT_Nigeria/HCP_t1t2_ALL/sim/1*'
+    data_dir = 'Path/To/Your/Data/Directory'  # Update this path to your data directory
     files = glob.glob(data_dir + '/T1w/T1w_acpc_dc_restore_brain.nii.gz')
-    print(len(files))
-    print(files[:5])
+    print(f"Total files: {len(files)}")
     
     # Filter files based on lst_files
     files_new = []
@@ -251,7 +252,7 @@ def create_argparser():
         num_samples=1,
         batch_size=1,
         use_ddim=False,
-        model_path="/cluster/project0/IQT_Nigeria/skim/diffusion_inverse/guided-diffusion/logs_large_zero2two_HCPMoreSlice2025/model360000.pt",
+        model_path="ADD_YOUR_MODEL_PATH_HERE.pth",
     )
     defaults.update(model_and_diffusion_defaults())
     parser = argparse.ArgumentParser()
