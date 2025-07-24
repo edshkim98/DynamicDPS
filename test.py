@@ -42,7 +42,7 @@ def main():
     set_seed(42)
 
     # Load configuration
-    config_path = '/cluster/project0/IQT_Nigeria/skim/diffusion_inverse/guided-diffusion/configs.yaml'
+    config_path = '/cluster/project0/IQT_Nigeria/skim/diffusion_inverse/DynamicDPS/configs.yaml'
     with open(config_path) as file:
         configs = yaml.load(file, Loader=yaml.FullLoader)
     
@@ -133,7 +133,7 @@ def main():
         print(fname_curr, slice_curr)
         
         # Load the conditional model's output
-        data = np.load(f'./cond_results/unet/ood_contrast/{fname_curr}/pred_{slice_curr}_axial.npy')[0]
+        data = np.load(f'/cluster/project0/IQT_Nigeria/skim/diffusion_inverse/guided-diffusion/cond_results/unet/ood_contrast/{fname_curr}/pred_{slice_curr}_axial.npy')[0]
         mean = 271.64814106698583
         std = 377.117173547721
         
@@ -148,7 +148,7 @@ def main():
         group_size = 50
         for i in range(0, 1000, 1):
             curr_time = '[' + str(i) + ']'
-            df_curr = df[df['time'] == curr_time]
+            df_curr = df[df['Time'] == curr_time]
             loss = df_curr['Loss'].values
             loss_dict[i] = np.mean(loss)
 
@@ -161,8 +161,9 @@ def main():
         values_chunks = [sorted_values[i:i + group_size] for i in range(0, len(sorted_values), group_size)]
 
         # 3. Compute the average of each chunk
-        mean_keys = [np.mean(chunk) for chunk in chunks]
+        mean_keys = [chunk[-1] for chunk in chunks]
         mean_values = [np.mean(values_chunk) for values_chunk in values_chunks]
+        mean_values = torch.tensor(mean_values)
 
         # Forward measurement model (Ax + n)
         y = operator.forward(ref_img)
@@ -173,21 +174,25 @@ def main():
         data_low = operator.forward(data)
 
         # Calculate the data likelihood
-        test_likelihood = torch.linalg.norm(y - data_low)
+        test_likelihood = torch.linalg.norm(y - data_low)**configs['tau']
         print(f"Test likelihood: {test_likelihood.item()}")
 
         # Find the time index corresponding to the closest mean value
         closest_time_idx = np.argmin(np.abs(mean_values - test_likelihood.item()))
+        if (mean_values[closest_time_idx] < test_likelihood.item()) and (closest_time_idx > 1):
+            closest_time_idx -= 1
         print(f"Closest time index: {closest_time_idx}, Mean value: {mean_values[closest_time_idx]}")
         # Get the corresponding time value
-        closest_time = mean_keys[closest_time_idx] * group_size
+        closest_time = mean_keys[closest_time_idx]
         print(f"Closest time: {closest_time}")
         
         # Inject noise if skip_timestep is enabled 
         if configs['skip_timestep']:
-            skip_x0 = 1000 - closest_time #torch.tensor(data).unsqueeze(0).unsqueeze(0).to(torch.float32).to(device)
+            skip_x0 = data #torch.tensor(data).unsqueeze(0).unsqueeze(0).to(torch.float32).to(device)
+            skip_timestep = 999 - closest_time
         else:
             skip_x0 = None
+            skip_timestep = configs['skip_timestep']
             
         sample_fn = (
             diffusion.p_sample_loop if not args.use_ddim else diffusion.ddim_sample_loop
@@ -199,7 +204,7 @@ def main():
             measurement_cond_fn=measurement_cond_fn,
             clip_denoised=args.clip_denoised,
             model_kwargs=model_kwargs,
-            skip_timesteps=configs['skip_timestep'],
+            skip_timesteps=skip_timestep,
             skip_x0=skip_x0,
             line_search=configs['line_search']
         )
@@ -246,7 +251,7 @@ def create_argparser():
         num_samples=1,
         batch_size=1,
         use_ddim=False,
-        model_path="./logs_large_zero2two_HCPMoreSlice2025/model360000.pt",
+        model_path="/cluster/project0/IQT_Nigeria/skim/diffusion_inverse/guided-diffusion/logs_large_zero2two_HCPMoreSlice2025/model360000.pt",
     )
     defaults.update(model_and_diffusion_defaults())
     parser = argparse.ArgumentParser()
