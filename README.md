@@ -56,10 +56,14 @@ python test.py
 
 If you find this work useful, please consider citing:
 ```bibtex
-@article{kim2025tackling,
-  title={Tackling Hallucination from Conditional Models for Medical Image Reconstruction with DynamicDPS},
-  author={Kim, Seunghoi and Tregidgo, Henry FJ and Figini, Matteo and Jin, Chen and Joshi, Sarang and Alexander, Daniel C},
-  journal={arXiv preprint arXiv:2503.01075},
-  year={2025}
+@InProceedings{KimSeu_Tackling_MICCAI2025,
+        author = { Kim, Seunghoi AND Tregidgo, Henry F. J. AND Figini, Matteo AND Jin, Chen AND Joshi, Sarang AND Alexander, Daniel C.},
+        title = { { Tackling Hallucination from Conditional Models for Medical Image Reconstruction with DynamicDPS } },
+        booktitle = {proceedings of Medical Image Computing and Computer Assisted Intervention -- MICCAI 2025},
+        year = {2025},
+        publisher = {Springer Nature Switzerland},
+        volume = {LNCS 15963},
+        month = {September},
+        page = {593 -- 603}
 }
 ```
