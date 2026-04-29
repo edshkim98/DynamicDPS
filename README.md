@@ -2,7 +2,7 @@
 
 **Official implementation of the MICCAI 2025 (Early Accept, Top 9%) paper**
 
-> **Status:** Code under active development
+> **Status:** Pre-trained model checkpoint released, train and test demo code available
 
 [Paper](https://arxiv.org/pdf/2503.01075) &nbsp;&nbsp;|&nbsp;&nbsp; [Contact Author](mailto:seunghoi.kim.17@ucl.ac.uk)
 
@@ -47,6 +47,12 @@ python image_train.py
 
 ### Solve Inverse Problems (e.g., Low-Field MRI Enhancement)
 ```bash
+python test.py
+```
+
+### Update (2026.04): Code refactoring + added a parameter estimation stage to the inference pipeline for on-the-fly degradation parameter estimation. See ./test_src for reference.
+```bash
+cd test_src
 python test.py
 ```
 
