@@ -1,0 +1,44 @@
+# Core normalization settings
+norm: 'zero2two'
+mean: 259.3117656881453 
+std: 362.1817760568698 
+
+# Sampling configuration
+line_search: True
+fine_tune: False
+skip_timestep: True
+tau: 0.4
+data_dir: '/cluster/project0/IQT_Nigeria/HCP_t1t2_ALL/sim/9*'
+gt_name: 'V001_HF_T1_0p7x0p7x5.nii.gz'
+meas_name: 'V001_LF_T1_SS.nii.gz'
+meas_resampled_name: 'V001_LF_T1_SS_0p7x0p7x5.nii.gz'
+warmstart_name: 'V001_LF_T1_SS_synthsr_0p7x0p7x5.nii.gz'
+segmap_name: 'V001_LF_T1_SS_synthseg_0p7x0p7x5.nii.gz'
+
+# Data configuration
+data:
+  return_id: True
+
+# Data normalization for datasets  
+Data:
+  mean_hr: 259.3117656881453 
+  std_hr: 362.1817760568698 
+
+# Conditioning method configuration
+conditioning:
+  method: 'ps'
+  params:
+    scale: 1.0
+
+# Measurement operator configuration
+measurement:
+  operator:
+    name: 'gaussian_blur'
+    kernel_size: 21
+    intensity: 2.0
+    gamma: 1.0
+    down_scale: 1.43
+  
+  noise: 
+    name: 'gaussian'
+    sigma: 0.001
