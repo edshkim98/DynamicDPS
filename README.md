@@ -50,6 +50,12 @@ python image_train.py
 python test.py
 ```
 
+### Update (2026.04): Refactoring and Added a parameter estimation stage to the inference pipeline for on-the-fly degradation parameter estimation. See ./test_src for reference.
+```bash
+cd test_src
+python test.py
+```
+
 ---
 
 ## Citation
