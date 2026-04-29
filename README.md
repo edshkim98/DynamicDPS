@@ -38,7 +38,7 @@ Below: Visual comparisons on REAL low-field MR scans. DynamicDPS demonstrates su
 >
 > You need to unzip motionblur.zip first
 >
-> Download the pretrained model here -> LINK
+> Download the pretrained model here -> [LINK](https://drive.google.com/file/d/1sao47qXfA6MXVuZl0iTh6ZS5l4dakN_M/view?usp=drive_link)
 
 ### Training the Score-Matching Model
 ```bash
