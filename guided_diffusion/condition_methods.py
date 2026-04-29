@@ -8,11 +8,10 @@ import numpy as np
 import torch.nn as nn
 from timm import create_model
 from torch.nn.functional import interpolate
-import csv
-import torchvision.transforms as transforms
 import pandas as pd
 import warnings
 from torch.optim import LBFGS
+import os
 
 warnings.filterwarnings("ignore")
 
@@ -223,51 +222,8 @@ class ConditioningMethod(ABC):
         self.operator = operator
         self.noiser = noiser
         self.ssim = PatchSSIMLoss(patch_size=32)
-        self.perceptual_loss = PerceptualLoss(device=device)
         self.tv = TotalVariationLoss()
         self.edge_ls = CannyEdgeLoss(low_threshold=0.05, high_threshold=0.1)
-        self.cnt = 0
-
-    def edge_loss(self, image1, image2):
-        """
-        Compute edge loss between two 1-channel images using Sobel filters.
-        The loss is the mean squared error (MSE) between the edge maps of the two images.
-
-        Args:
-            image1 (torch.Tensor): First image, shape (B, 1, H, W), values in [0, 1].
-            image2 (torch.Tensor): Second image, shape (B, 1, H, W), values in [0, 1].
-
-        Returns:
-            torch.Tensor: Scalar edge loss.
-        """
-
-        def sobel_filter(image):
-            # Sobel filters for edge detection
-            sobel_x = torch.tensor([[-1, 0, 1],
-                                    [-2, 0, 2],
-                                    [-1, 0, 1]], device=image.device).view(1, 1, 3, 3)
-            sobel_x = sobel_x.to(image.dtype)
-            sobel_y = torch.tensor([[-1, -2, -1],
-                                    [ 0,  0,  0],
-                                    [ 1,  2,  1]], device=image.device).view(1, 1, 3, 3)
-            sobel_y = sobel_y.to(image.dtype)
-            # Apply Sobel filters in x and y directions
-            grad_x = F.conv2d(image, sobel_x, padding=1)  # Gradient in x-direction
-            grad_y = F.conv2d(image, sobel_y, padding=1)  # Gradient in y-direction
-            
-            # Compute gradient magnitude
-            grad_magnitude = torch.sqrt(grad_x ** 2 + grad_y ** 2 + 1e-8)
-            return grad_magnitude
-
-        # Compute edge maps for both images
-        edge_map1 = sobel_filter(image1.to(torch.float32))
-        edge_map2 = sobel_filter(image2.to(torch.float32))
-
-        # Compute mean squared error between edge maps
-        difference = edge_map1 - edge_map2
-        loss = torch.linalg.norm(difference)
-        #loss = F.mse_loss(edge_map1, edge_map2)
-        return loss    
 
     def project(self, data, noisy_measurement, **kwargs):
         return self.operator.project(data=data, measurement=noisy_measurement, **kwargs)
@@ -317,7 +273,7 @@ class ConditioningMethod(ABC):
                 # pred_measurement[pred_measurement < 0.] = 0.
                 # measurement[measurement < 0.] = 0.
                 #percept = self.perceptual_loss(pred_measurement.type(torch.float32), measurement.type(torch.float32))
-                norm_total = norm + 0.5*edge_ls + 0.5*ssim #+ 0.005*tv
+                norm_total = norm + 0.5*edge_ls + 0.1*ssim #+ 0.005*tv
                 norm_grad = torch.autograd.grad(outputs=norm_total, inputs=x_prev)[0]
         
         elif self.noiser.__name__ == 'poisson':
@@ -380,112 +336,87 @@ class PosteriorSampling(ConditioningMethod):
         print(f"Using L-BFGS: {self.use_lbfgs}")
         
         self.csv_file = "./line_search_stepsize.csv"
-        with open(self.csv_file, "w", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerow(["Epoch", "Step Size"])
+
+        if os.path.exists(self.csv_file):
+            self.stepsize_df = pd.read_csv(self.csv_file)
+        else:
+            self.stepsize_df = pd.DataFrame(columns=['Epoch', 'Step Size'])
         
     def line_search(self, x_prev, x_t, x_0_hat, measurement, norm_grad, norm, t, **kwargs):
-        """
-        Perform line search to find step size (alpha) satisfying Wolfe conditions.
-        """
-        #self.alpha = self.scale_original  # Initial step size
-        alpha_min = 0.3 #1e-8  # Minimum step size
-        alpha_max = 1.0 #4.0*self.scale_original  # Maximum step size
-        scale = self.scale
+        self.alpha = self.scale_original          # FIX 3: reset
+        alpha_min = 0.1                          # FIX 4: sensible floor
+        alpha_max = 1.5 * self.scale_original
 
-        # Original function and gradient values
-        norm_orig = norm #torch.linalg.norm(measurement - self.operator.forward(x_0_hat, **kwargs))
-        grad_orig = -1*norm_grad.view(-1).dot(norm_grad.view(-1))  # Norm of the gradient (directional derivative)
+        norm_orig = norm
+        # φ'(0) = ∇f(x_t)·p where p = -norm_grad
+        grad_orig = -norm_grad.reshape(-1).dot(norm_grad.reshape(-1))   # negative scalar
 
-        for _ in range(self.max_line_search):
-            # Apply step size to get new x_t
+        for i in range(self.max_line_search):
             x_t_new = x_t - self.alpha * norm_grad
-            #x_t_new.requires_grad_()  # Ensure gradient tracking #############
-            
-            # Compute new norm and gradient
-            #with torch.no_grad():            
-            if t > 0:
-                x_0_hat_new = kwargs['func'](kwargs['model'], x_t_new, t-1, kwargs['clip_denoised'], kwargs['denoised_fn'], kwargs['cond_fn'], kwargs['model_kwargs'])['pred_xstart']
-            
-            # Ensure x_prev tracks gradients
-            #x_prev = x_prev.clone().detach().requires_grad_()  #############
-            
-            norm_grad_new, norm_new = self.grad_and_value(x_prev=x_t_new, x_0_hat=x_0_hat_new, measurement=measurement, t=t, use_lbfgs=False, **kwargs)
-            assert len(torch.unique(norm_grad_new.cpu().detach())) > 1, f"Norm grad is zero: {torch.unique(norm_grad_new.cpu().detach())}"
 
-            # Check Wolfe conditions
-            # 1. Sufficient decrease (Armijo condition)
-            #print("NORM New, Norm, Grad")
-            #print(norm_new.detach().cpu(), norm_orig + self.c1 * self.alpha * grad_orig, grad_orig)
-           
+            # FIX 5: use t, not t-1; handle t==0
+            x_0_hat_new = kwargs['func'](
+                kwargs['model'], x_t_new, t,
+                kwargs['clip_denoised'], kwargs['denoised_fn'],
+                kwargs['cond_fn'], kwargs['model_kwargs']
+            )['pred_xstart']
+
+            norm_grad_new, norm_new = self.grad_and_value(
+                x_prev=x_t_new, x_0_hat=x_0_hat_new,
+                measurement=measurement, t=t, use_lbfgs=False, **kwargs
+            )
+
+            # Armijo: φ(α) ≤ φ(0) + c1·α·φ'(0)
             if norm_new > norm_orig + self.c1 * self.alpha * grad_orig:
-                print("Armjiho condition not met")
-                self.alpha *= 0.75  # Reduce step size
-                # print(norm_new, norm_orig + self.c1 * alpha * grad_orig)
+                self.alpha *= 0.75
                 if self.alpha < alpha_min:
                     self.alpha = alpha_min
-                    break   # Break if minimum step size is reached
+                    break
                 continue
 
-            # 2. Curvature condition
-            grad_new = torch.abs(-1*norm_grad_new.view(-1).dot(norm_grad.view(-1)))
-            #grad_new = torch.abs(-1*norm_grad_new.view(-1).dot(norm_grad.view(-1)))
-            #print("Grad NEW, Grad_Orig")
-            #print(torch.abs(grad_new), torch.abs(grad_orig))
-            if grad_new < self.c2 * torch.abs(grad_orig):
-                print("Curvature condition not met")
-                self.alpha *= 1.5  # Increase step size
+            # Strong Wolfe curvature: |φ'(α)| ≤ c2·|φ'(0)|
+            # φ'(α) = ∇f(x_new)·p = -norm_grad_new·norm_grad
+            phi_prime_alpha = -norm_grad_new.reshape(-1).dot(norm_grad.reshape(-1))
+            if torch.abs(phi_prime_alpha) > self.c2 * torch.abs(grad_orig):   # FIX 2: flipped
+                self.alpha *= 1.25
                 if self.alpha > alpha_max:
                     self.alpha = alpha_max
-                    break   # Break if maximum step size is reached
+                    break
                 continue
 
-            # If both conditions are satisfied, return the step size
             return self.alpha
 
-        # If no suitable step size is found, return the minimum step size
-        return self.alpha #alpha_min
-    
+        return self.alpha
+
     def conditioning(self, x_prev, x_t, x_0_hat, measurement, t, **kwargs):
-    # Compute initial gradient and norm
-        #x_prev.requires_grad_()  ###############
         norm_grad, norm = self.grad_and_value(x_prev=x_prev, x_0_hat=x_0_hat, measurement=measurement, t=t, use_lbfgs=self.use_lbfgs, **kwargs)
-        #Add t and norm to dataframe
-        self.loss_df = self.loss_df.append({'Time': t.cpu().numpy(), 'Loss': norm.detach().cpu().numpy()}, ignore_index=True)
-        #print(f"Loss at {t.cpu().detach().numpy()}: {norm}")
+        self.loss_df = pd.concat([self.loss_df, pd.DataFrame([{'Time': t.cpu().numpy(), 'Loss': norm.detach().cpu().numpy()}])], ignore_index=True)
         if self.best_ls > norm:
             self.best_ls = norm
             self.best_x = x_0_hat
 
         self.alpha = self.scale_original
         # Perform line search to find step size satisfying Wolfe conditions
-        if (kwargs['line_search']) and (t>0):
+        if (kwargs['line_search']) and (t > 5) and (t % 5 == 0):
+            print(f"Time step: {t}")
             self.scale = self.line_search(x_prev.detach(), x_t.detach().requires_grad_(True), x_0_hat, measurement, norm_grad.detach(), norm, t, **kwargs)
-            # print(f"Line Search Activated! Step size for iteration {t}: {self.scale}")
-            # Save to CSV
-            with open(self.csv_file, 'a', newline='') as file:
-                writer = csv.writer(file)
-                writer.writerow([t, self.scale])
+            self.stepsize_df = pd.concat([self.stepsize_df, pd.DataFrame([{'Epoch': t.cpu().numpy(), 'Step Size': self.scale}])], ignore_index=True)
+            self.stepsize_df.to_csv(self.csv_file)
         else:
-            #self.scale = self.scale_original
+            if t <= 5:
+                self.scale = 0.1
             if kwargs['line_search']:
-                with open(self.csv_file, 'a', newline='') as file:
-                    writer = csv.writer(file)
-                    writer.writerow([t, self.scale])
+                self.stepsize_df = pd.concat([self.stepsize_df, pd.DataFrame([{'Epoch': t.cpu().numpy(), 'Step Size': self.scale}])], ignore_index=True)
+                self.stepsize_df.to_csv(self.csv_file)
                 print(f"Step size for final iteration {t}: {self.scale}")
-        
+
         x_t -= norm_grad * self.scale
-        #diff = measurement - x_0_hat
-        #extrinsic_loss = torch.linalg.norm(diff)
-        #x_t += extrinsic_loss * self.scale * 0.5
-        #if (t % 10 == 0) and (t <= 100):
-        #    np.save(f"x_pred_{t.detach().cpu().numpy()}.npy", x_0_hat.detach().cpu().numpy())
+
         if t > 0:
             return x_t, norm
         print("Returning best loss: ", self.best_ls)
         print("Re-initializing best loss")
         self.best_ls = 1000
-        #save dataframe
         self.loss_df.to_csv('measurement_loss_timestep.csv')
         return self.best_x, self.best_ls
         
